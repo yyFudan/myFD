@@ -4,8 +4,12 @@ import json
 import time
 import hashlib
 import requests
+import numpy
+import io
+import easyocr
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone, timedelta
+from PIL import Image
 
 USERNAME = os.getenv("USERNAME")
 PASSWORD = os.getenv("PASSWORD")
@@ -16,6 +20,7 @@ login_url = "https://uis.fudan.edu.cn/authserver/login?service=https%3A%2F%2Fzla
 get_info_url = "https://zlapp.fudan.edu.cn/ncov/wap/fudan/get-info"
 save_log_url = "https://zlapp.fudan.edu.cn/wap/log/save-log"
 save_url = "https://zlapp.fudan.edu.cn/ncov/wap/fudan/save"
+code_url="https://zlapp.fudan.edu.cn/backend/default/code"
 
 
 def get_session(_login_info):
@@ -126,19 +131,52 @@ if __name__ == "__main__":
 
         payload = get_payload(historical_info)
         payload_str = get_payload_str(payload)
+        province = payload["province"]
+        city = payload["city"]
+        district = json.loads(payload["geo_api_info"])["addressComponent"].get("district", "")
+        # print(province)
+        # print(city)
+        # print(district)
         # print(payload_str)
+        # sys.exit()
+        i = 0
+        while True:
+            img = session.get(code_url).content
+            image = numpy.array(Image.open(io.BytesIO(img)))
+            reader = easyocr.Reader(['en'])
+            result = reader.readtext(image, detail = 0)
+            # print(result[0])
+            # sys.exit()
 
-        if payload.get("date") == get_today_date():
-            notify(f"今日已打卡：{payload.get('area')}", f"今日已打卡：{payload_str}")
-            sys.exit()
+            if payload.get("date") == get_today_date():
+                notify(f"今日已打卡：{payload.get('area')}", f"今日已打卡：{payload_str}")
+                sys.exit()
+            
+            payload.update(
+                {
+                    "tw": "13",
+                    "province": province,
+                    "city": city,
+                    "area": " ".join((province, city, district)),
+                    "sfzx": "1",  # 是否在校
+                    "fxyy": "",  # 返校原因
+                    "code": result[0],
+                }
+            )
 
-        time.sleep(5)
-        response = save(session, payload)
+            time.sleep(5)
+            response = save(session, payload)
 
-        if response.status_code == 200 and response.text == '{"e":0,"m":"操作成功","d":{}}':
-            notify(f"打卡成功：{payload.get('area')}", payload_str)
-        else:
-            notify("打卡失败，请手动打卡", response.text)
+            if response.status_code == 200 and json.loads(response.text)["e"] != 1:
+                # print(i)
+                notify(f"打卡成功：{payload.get('area')}", payload_str)
+                break
+            if i > 100:
+                notify("打卡失败，请手动打卡", response.text)
+                break
+            i += 1
+
+        # '{"e":0,"m":"操作成功","d":{}}'
 
     except Exception as e:
         notify("打卡失败，请手动打卡", str(e))
