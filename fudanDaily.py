@@ -139,6 +139,10 @@ if __name__ == "__main__":
         # print(district)
         # print(payload_str)
         # sys.exit()
+        if province == "上海市":
+            zx = "1"
+        else:
+            zx = "0"
         i = 0
         while True:
             img = session.get(code_url).content
@@ -158,7 +162,7 @@ if __name__ == "__main__":
                     "province": province,
                     "city": city,
                     "area": " ".join((province, city, district)),
-                    "sfzx": "1",  # 是否在校
+                    "sfzx": zx,  # 是否在校
                     "fxyy": "",  # 返校原因
                     "code": result[0],
                 }
