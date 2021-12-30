@@ -17,7 +17,10 @@ jobs:
         with:
           python-version: '3.8'
       - name: Prepare environment
-        run: pip install beautifulsoup4 lxml requests easyocr pillow numpy
+        run: |
+          python -m pip install --upgrade pip
+          pip install opencv-python==4.5.4.60
+          pip install beautifulsoup4 lxml requests easyocr pillow numpy
       - name: Run app
         run: python fudanDaily.py
         env:
